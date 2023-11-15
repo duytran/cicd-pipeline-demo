@@ -57,14 +57,20 @@ class PipelineStack(Stack):
                     "phases": {
                         "install": {
                             "commands": [
-                                "npm install -g aws-cdk"
+                                "npm install -g aws-cdk",
+                                "npm install -g cdk-assets",
                                 "pip install -r requirements.txt",
                             ]
                         },
-                        "build": {"commands": ["cdk synth --no-lookups -o dist"]},
+                        "build": {"commands": ["cdk synth --no-lookups"]},
+                        "post_build": {
+                            "commands": [
+                                "for FILE in cdk.out/*.assets.json; do cdk-assets -p $FILE publish; done"
+                            ]
+                        },
                     },
                     "artifacts": {
-                        "base-directory": "dist",
+                        "base-directory": "cdk.out",
                         "files": ["*.template.json"],
                     },
                 },
@@ -101,6 +107,12 @@ class PipelineStack(Stack):
         )
 
         # Code Deploy Dev
+        deploy_dev = cpactions.CloudFormationCreateUpdateStackAction(
+            action_name="DeployDevApplication",
+            template_path=cdk_build_output.at_path("DevApplicationStack.template.json"),
+            stack_name="DevApplicationStack",
+            admin_permissions=True,
+        )
 
         # Code Deploy Stag
 
@@ -113,5 +125,7 @@ class PipelineStack(Stack):
             stages=[
                 {"stageName": "Source", "actions": [source_action]},
                 {"stageName": "UnitTest", "actions": [unittest_build_action]},
+                {"stageName": "BuildTemplate", "actions": [cdk_build_action]},
+                {"stageName": "DeployDev", "actions": [deploy_dev]},
             ],
         )
