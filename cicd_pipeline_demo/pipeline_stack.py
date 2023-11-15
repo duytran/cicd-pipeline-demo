@@ -34,7 +34,9 @@ class PipelineStack(Stack):
                             ]
                         },
                         "build": {
-                            "commands": ["pytest -s -v unittest/test_lambda_logic.py"]
+                            "commands": [
+                                "python -m pytest -s -v unittest/test_lambda_logic.py"
+                            ]
                         },
                     },
                     "artifacts": {},
