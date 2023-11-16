@@ -1,6 +1,24 @@
 
-# Welcome to your CDK Python project!
+# Basic CI/CD Pipeline!
 
+## Introduction
+
+This shows a basic examle of a ci/cd pipeline for a lambda: codebuild for unittest, codeploy for deploy the lambda stack.
+
+![AWS diagram](/img/diagram.png)
+
+## Github Oath Setting
+
+![Github setting](/img/github.png)
+
+## Reference
+
+* [cicd-integration-test](https://github.com/cdk-entest/cicd-integration-test)
+* [Webhook could not be registered with GitHub.](https://github.com/0x4447/0x4447_product_s3_email/issues/22)
+* [CDK Deploy-Step Fails - Lambda Assets not uploaded to S3 after build ](https://github.com/aws/aws-cdk/issues/11025)
+
+
+## How to run
 This is a blank project for CDK development with Python.
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.

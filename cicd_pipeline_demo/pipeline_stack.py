@@ -1,7 +1,8 @@
-from aws_cdk import Stack, SecretValue, StageProps
+from aws_cdk import Aws, Stack, SecretValue, DefaultStackSynthesizer, RemovalPolicy
 from aws_cdk import aws_codepipeline as codepipeline
 from aws_cdk import aws_codepipeline_actions as cpactions
 from aws_cdk import aws_codebuild as codebuild
+from aws_cdk import aws_iam as iam
 from constructs import Construct
 
 
@@ -45,7 +46,7 @@ class PipelineStack(Stack):
         )
 
         # Code Build CDK template
-        cdk_code_build = codebuild.PipelineProject(
+        cdk_code_build_project = codebuild.PipelineProject(
             self,
             "CodeBuildCDK",
             environment=codebuild.BuildEnvironment(
@@ -77,6 +78,19 @@ class PipelineStack(Stack):
             ),
         )
 
+        # create permission to assume the file asset publishing role
+        assets_publishing_permissions = iam.PolicyStatement(
+            sid="extraPermissionsRequiredForPublishingAssets",
+            effect=iam.Effect.ALLOW,
+            actions=["sts:AssumeRole"],
+            resources=[
+                f"arn:aws:iam::{Aws.ACCOUNT_ID}:role/cdk-{DefaultStackSynthesizer.DEFAULT_QUALIFIER}-file-publishing-role-{Aws.ACCOUNT_ID}-{Aws.REGION}"
+            ],
+        )
+
+        # attach the permission to the role created with build cdk job
+        cdk_code_build_project.add_to_role_policy(assets_publishing_permissions)
+
         # Github connection action
         source_action = cpactions.GitHubSourceAction(
             action_name="Github",
@@ -101,7 +115,7 @@ class PipelineStack(Stack):
         # CDK build action
         cdk_build_action = cpactions.CodeBuildAction(
             action_name="BuildCfnTemplate",
-            project=cdk_code_build,
+            project=cdk_code_build_project,
             input=source_output,
             outputs=[cdk_build_output],
         )
@@ -114,7 +128,8 @@ class PipelineStack(Stack):
             admin_permissions=True,
         )
 
-        # Code Deploy Stag
+        # Manual approval action
+        manual_approval_action = cpactions.ManualApprovalAction(action_name="Approve")
 
         # pipeline
         pipeline = codepipeline.Pipeline(
@@ -126,6 +141,10 @@ class PipelineStack(Stack):
                 {"stageName": "Source", "actions": [source_action]},
                 {"stageName": "UnitTest", "actions": [unittest_build_action]},
                 {"stageName": "BuildTemplate", "actions": [cdk_build_action]},
+                {"stageName": "Approve", "actions": [manual_approval_action]},
                 {"stageName": "DeployDev", "actions": [deploy_dev]},
             ],
         )
+
+        # destroy artifact bucket when deleling pipeline
+        pipeline.artifact_bucket.apply_removal_policy(RemovalPolicy.DESTROY)
