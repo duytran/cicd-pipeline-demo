@@ -7,19 +7,69 @@ This shows a basic examle of a ci/cd pipeline for a lambda: codebuild for unitte
 
 ![AWS diagram](/img/diagram.png)
 
-## Github Oath Setting
+## Github Generate Auth Key Setting
 
 ![Github setting](/img/github.png)
+
+## Push lambda asset after build cdk stack
+
+```python
+# Code Build CDK template
+cdk_code_build_project = codebuild.PipelineProject(
+    self,
+    "CodeBuildCDK",
+    environment=codebuild.BuildEnvironment(
+        build_image=codebuild.LinuxBuildImage.STANDARD_5_0
+    ),
+    build_spec=codebuild.BuildSpec.from_object(
+        {
+            "version": "0.2",
+            "phases": {
+                "install": {
+                    "commands": [
+                        "npm install -g aws-cdk",
+                        "npm install -g cdk-assets",
+                        "pip install -r requirements.txt",
+                    ]
+                },
+                "build": {"commands": ["cdk synth --no-lookups"]},
+                "post_build": {
+                    "commands": [
+                        "for FILE in cdk.out/*.assets.json; do cdk-assets -p $FILE publish; done"
+                    ]
+                },
+            },
+            "artifacts": {
+                "base-directory": "cdk.out",
+                "files": ["*.template.json"],
+            },
+        },
+    ),
+)
+
+# create permission to assume the file asset publishing role
+assets_publishing_permissions = iam.PolicyStatement(
+    sid="extraPermissionsRequiredForPublishingAssets",
+    effect=iam.Effect.ALLOW,
+    actions=["sts:AssumeRole"],
+    resources=[
+        f"arn:aws:iam::{Aws.ACCOUNT_ID}:role/cdk-{DefaultStackSynthesizer.DEFAULT_QUALIFIER}-file-publishing-role-{Aws.ACCOUNT_ID}-{Aws.REGION}"
+    ],
+)
+
+# attach the permission to the role created with build cdk job
+cdk_code_build_project.add_to_role_policy(assets_publishing_permissions)
+```
 
 ## Reference
 
 * [cicd-integration-test](https://github.com/cdk-entest/cicd-integration-test)
 * [Webhook could not be registered with GitHub.](https://github.com/0x4447/0x4447_product_s3_email/issues/22)
 * [CDK Deploy-Step Fails - Lambda Assets not uploaded to S3 after build ](https://github.com/aws/aws-cdk/issues/11025)
+* [Github Source Action](https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_codepipeline_actions/GitHubSourceAction.html)
 
 
 ## How to run
-This is a blank project for CDK development with Python.
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
